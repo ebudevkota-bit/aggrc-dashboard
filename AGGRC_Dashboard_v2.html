@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGGRC — Engagement Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #ffffff;
+    --bg2:      #f7f7f5;
+    --bg3:      #f0efec;
+    --text:     #1a1a1a;
+    --text2:    #6b6b6b;
+    --text3:    #9a9a9a;
+    --border:   rgba(0,0,0,0.09);
+    --border2:  rgba(0,0,0,0.15);
+    --radius:   8px;
+    --radius-lg:12px;
+    --teal:     #1D9E75;
+    --teal-bg:  #E1F5EE;
+    --teal-txt: #0F6E56;
+    --blue-bg:  #E6F1FB;
+    --blue-txt: #185FA5;
+    --amber-bg: #FAEEDA;
+    --amber-txt:#854F0B;
+    --purple-bg:#EEEDFE;
+    --purple-txt:#534AB7;
+    --coral-bg: #FAECE7;
+    --coral-txt:#993C1D;
+    --green-bg: #EAF3DE;
+    --green-txt:#3B6D11;
+    --gray-bg:  #F1EFE8;
+    --gray-txt: #5F5E5A;
+    --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #141414;
+      --bg2:     #1c1c1c;
+      --bg3:     #232323;
+      --text:    #e8e8e6;
+      --text2:   #8a8a8a;
+      --text3:   #5a5a5a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+    }
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+
+  /* ── LAYOUT ── */
+  .shell { display: flex; flex-direction: column; min-height: 100vh; }
+  .topbar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; flex-wrap: wrap; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .brand-sub  { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .status { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); display: inline-block; }
+  .dot.demo { background: #BA7517; }
+  .btn-ghost { font-size: 12px; padding: 5px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; font-family: var(--font); transition: background .15s; }
+  .btn-ghost:hover { background: var(--bg2); }
+  .btn-ghost:disabled { opacity: .5; cursor: default; }
+
+  /* ── TABS ── */
+  .tab-bar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+  .tab { padding: 10px 16px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: var(--font); transition: color .15s; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.on { color: var(--text); border-bottom-color: var(--text); }
+
+  /* ── MAIN ── */
+  .main { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .sec { display: none; } .sec.on { display: block; }
+
+  /* ── METRICS ── */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .metric { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-val { font-size: 24px; font-weight: 600; color: var(--text); line-height: 1; }
+  .metric-lbl { font-size: 11px; color: var(--text2); margin-top: 5px; }
+
+  /* ── CHART CARDS ── */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .cc { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+  .cc.full { grid-column: span 2; }
+  .cc-lbl { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
+
+  /* ── SEARCH / FILTER ── */
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .s-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .35; pointer-events: none; }
+  .search { width: 100%; padding: 8px 10px 8px 32px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s; }
+  .search:focus { border-color: var(--border2); }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .fb { font-size: 11px; padding: 4px 10px; border: 0.5px solid var(--border); border-radius: 20px; background: transparent; color: var(--text2); cursor: pointer; font-family: var(--font); transition: all .15s; }
+  .fb:hover, .fb.on { background: var(--bg2); color: var(--text); border-color: var(--border2); }
+
+  /* ── EVENT LIST ── */
+  .ev-hdr { display: grid; grid-template-columns: 80px 1fr 110px 40px; gap: 8px; padding: 6px 10px; font-size: 11px; color: var(--text2); border-bottom: 0.5px solid var(--border); margin-bottom: 2px; }
+  .ev-row { display: grid; grid-template-columns: 80px 1fr 110px 40px; gap: 8px; align-items: center; padding: 9px 10px; border-radius: var(--radius); font-size: 12px; cursor: default; transition: background .12s; }
+  .ev-row:hover { background: var(--bg2); }
+  .ev-date { font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; }
+  .ev-group { font-weight: 500; color: var(--text); }
+  .ev-names { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .ev-n { text-align: right; font-weight: 600; color: var(--text); font-size: 13px; }
+  .empty { padding: 32px; text-align: center; color: var(--text2); font-size: 13px; }
+
+  /* ── BADGES ── */
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .bE { background: var(--teal-bg);   color: var(--teal-txt);   }
+  .bP { background: var(--blue-bg);   color: var(--blue-txt);   }
+  .bL { background: var(--amber-bg);  color: var(--amber-txt);  }
+  .bT { background: var(--purple-bg); color: var(--purple-txt); }
+  .bI { background: var(--gray-bg);   color: var(--gray-txt);   }
+  .bA { background: var(--coral-bg);  color: var(--coral-txt);  }
+  .bS { background: var(--green-bg);  color: var(--green-txt);  }
+  .bF { background: var(--amber-bg);  color: var(--amber-txt);  }
+  .bO { background: var(--gray-bg);   color: var(--gray-txt);   }
+
+  /* ── PEOPLE ── */
+  .slbl { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: .8px; margin: 16px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .slbl::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
+  .pg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .pc { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; text-align: center; transition: border-color .15s; }
+  .pc:hover { border-color: var(--border2); }
+  .av { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; }
+  .pc-name { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 3px; line-height: 1.3; }
+  .pc-role { font-size: 11px; color: var(--text2); margin-bottom: 8px; line-height: 1.4; }
+  .pc-tag  { font-size: 10px; padding: 2px 8px; border-radius: 20px; background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border); }
+
+  /* ── ADD BUTTON ── */
+  .add-btn { font-size: 12px; padding: 6px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; font-family: var(--font); margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
+  .add-btn:hover { background: var(--bg2); }
+
+  /* ── MODAL ── */
+  .mo-wrap { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: center; justify-content: center; }
+  .mo-wrap.open { display: flex; }
+  .mo { background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 22px; width: 380px; max-width: 95vw; }
+  .mo h3 { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 16px; }
+  .fr { margin-bottom: 10px; }
+  .fr label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+  .fr input, .fr select { width: 100%; padding: 7px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); font-family: var(--font); outline: none; }
+  .fr input:focus, .fr select:focus { border-color: var(--border2); }
+  .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ma { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .btn-save   { padding: 7px 18px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); }
+  .btn-cancel { padding: 7px 12px; background: none; border: 0.5px solid var(--border); border-radius: var(--radius); font-size: 13px; cursor: pointer; color: var(--text2); font-family: var(--font); }
+  .btn-save:hover   { opacity: .85; }
+  .btn-cancel:hover { border-color: var(--border2); color: var(--text); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .cc.full   { grid-column: span 1; }
+    .main { padding: 16px; }
+    .topbar { padding: 12px 16px; }
+    .ev-hdr, .ev-row { grid-template-columns: 68px 1fr 90px 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 24 C12 16,22 12,32 16 C38 18,42 22,40 24 C42 26,38 30,32 32 C22 36,12 32,8 24Z" fill="none" stroke="#1D9E75" stroke-width="2.2"/>
+        <path d="M40 24 L46 18 L44 24 L46 30Z" fill="#1D9E75" opacity=".85"/>
+        <path d="M14 20 C18 18,26 18,32 21" stroke="#1D9E75" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M14 28 C18 30,26 30,32 27" stroke="#1D9E75" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <circle cx="19" cy="24" r="2.5" fill="#1D9E75"/>
+        <circle cx="20" cy="23" r="1" fill="#fff" opacity=".9"/>
+      </svg>
+      <div>
+        <div class="brand-name">AGGRC</div>
+        <div class="brand-sub">Aquatic Germplasm &amp; Genetic Resources Center</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status"><span class="dot demo" id="statusDot"></span><span id="statusTxt">Loading…</span></div>
+      <button class="btn-ghost" id="refreshBtn" onclick="loadAll()">⟳ Refresh</button>
+    </div>
+  </header>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab on" role="tab" onclick="switchTab('overview')">Overview</button>
+    <button class="tab" role="tab" onclick="switchTab('events')">Engagements</button>
+    <button class="tab" role="tab" onclick="switchTab('staff')">Staff</button>
+    <button class="tab" role="tab" onclick="switchTab('students')">Students</button>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <section class="sec on" id="tab-overview" role="tabpanel">
+      <div class="metrics" id="metrics"></div>
+      <div class="chart-row">
+        <div class="cc">
+          <div class="cc-lbl">By context type</div>
+          <div style="position:relative;height:185px">
+            <canvas id="ctxChart" role="img" aria-label="Bar chart of engagement counts by context type">Engagement counts by context type.</canvas>
+          </div>
+        </div>
+        <div class="cc">
+          <div class="cc-lbl">Top groups by reach</div>
+          <div style="position:relative;height:185px">
+            <canvas id="grpChart" role="img" aria-label="Horizontal bar chart of top groups by participant count">Top groups by participant count.</canvas>
+          </div>
+        </div>
+      </div>
+      <div class="cc full">
+        <div class="cc-lbl">Monthly activity</div>
+        <div style="position:relative;height:130px">
+          <canvas id="timeChart" role="img" aria-label="Line chart of monthly engagement activity">Monthly engagement trend.</canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENGAGEMENTS -->
+    <section class="sec" id="tab-events" role="tabpanel">
+      <button class="add-btn" onclick="openM('event')">+ Log engagement</button>
+      <div class="search-wrap">
+        <span class="s-ico">🔍</span>
+        <input class="search" id="evSearch" placeholder="Search group, context, or name…" oninput="renderEvents()">
+      </div>
+      <div class="filters" id="ctxFilters"></div>
+      <div class="ev-hdr" aria-hidden="true"><span>Date</span><span>Group / names</span><span>Context</span><span style="text-align:right">N</span></div>
+      <div id="evList" role="list"></div>
+    </section>
+
+    <!-- STAFF -->
+    <section class="sec" id="tab-staff" role="tabpanel">
+      <button class="add-btn" onclick="openM('person','faculty')">+ Add staff</button>
+      <div class="slbl">Core team &amp; staff</div>
+      <div class="pg" id="staffGrid"></div>
+    </section>
+
+    <!-- STUDENTS -->
+    <section class="sec" id="tab-students" role="tabpanel">
+      <button class="add-btn" onclick="openM('person','student')">+ Add student</button>
+      <div class="slbl">Students, interns &amp; volunteers</div>
+      <div class="pg" id="studentsGrid"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- EVENT MODAL -->
+<div class="mo-wrap" id="eventModal" role="dialog" aria-modal="true" aria-label="Log engagement">
+  <div class="mo">
+    <h3>Log engagement</h3>
+    <div class="fg">
+      <div class="fr"><label for="f-date">Date</label><input type="date" id="f-date"></div>
+      <div class="fr"><label for="f-num">Participants</label><input type="number" id="f-num" min="1" value="1"></div>
+    </div>
+    <div class="fr"><label for="f-group">Group / organization</label><input type="text" id="f-group" placeholder="e.g. LSU Bio Club"></div>
+    <div class="fr"><label for="f-ctx">Context</label>
+      <select id="f-ctx">
+        <option>Engagement</option><option>Project</option><option>LAMA</option>
+        <option>Tour</option><option>Interview</option><option>Apprenticeship</option>
+        <option>Senior Design</option><option>Fundraising</option><option>Operations</option><option>Print</option>
+      </select>
+    </div>
+    <div class="fr"><label for="f-names">Names</label><input type="text" id="f-names" placeholder="Jane Doe, John Smith"></div>
+    <div class="fr"><label for="f-email">Email</label><input type="email" id="f-email"></div>
+    <div class="ma">
+      <button class="btn-cancel" onclick="closeM('event')">Cancel</button>
+      <button class="btn-save"   onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PERSON MODAL -->
+<div class="mo-wrap" id="personModal" role="dialog" aria-modal="true" aria-label="Add team member">
+  <div class="mo">
+    <h3>Add team member</h3>
+    <div class="fr"><label for="p-name">Full name</label><input type="text" id="p-name"></div>
+    <div class="fr"><label for="p-role">Role / title</label><input type="text" id="p-role"></div>
+    <div class="fr"><label for="p-email">Email</label><input type="email" id="p-email"></div>
+    <div class="fr"><label for="p-cat">Category</label>
+      <select id="p-cat">
+        <option value="faculty">Staff / faculty</option>
+        <option value="student">Student / intern</option>
+      </select>
+    </div>
+    <div class="ma">
+      <button class="btn-cancel" onclick="closeM('person')">Cancel</button>
+      <button class="btn-save"   onclick="savePerson()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── GOOGLE SHEETS CSV URLS ─────────────────────────────────────────────────
+const URLS = {
+  engagements: "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vRkq05WoKCMFWgNzD1eK3ylFN4pXDblRT4nMBdGWb0eeqwaV5eptPE86l3Zuq8UnA/pub?gid=471379633&single=true&output=csv",
+  staff:       "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vRkq05WoKCMFWgNzD1eK3ylFN4pXDblRT4nMBdGWb0eeqwaV5eptPE86l3Zuq8UnA/pub?gid=1134651326&single=true&output=csv",
+  students:    "https://corsproxy.io/?https://docs.google.com/spreadsheets/d/e/2PACX-1vRkq05WoKCMFWgNzD1eK3ylFN4pXDblRT4nMBdGWb0eeqwaV5eptPE86l3Zuq8UnA/pub?gid=252388855&single=true&output=csv",
+};
+
+// ── FALLBACK DEMO DATA ─────────────────────────────────────────────────────
+const DEMO_EV = [
+  {date:"2026-01-06",group:"WBRZ",ctx:"Interview",n:1,names:"David Hamilton"},
+  {date:"2026-01-08",group:"Meltio",ctx:"LAMA",n:5,names:"Gabriel Ortiz, Jose Luis Sanchez"},
+  {date:"2026-01-22",group:"CASN",ctx:"Engagement",n:4,names:"Natalie Ray, Summer Dann, Frank Neubrander"},
+  {date:"2026-01-27",group:"LSU Foundation",ctx:"Fundraising",n:1,names:"Claire Francois"},
+  {date:"2026-02-06",group:"BRCC Engineering Club",ctx:"Engagement",n:7,names:"Abigail Curl, Vickie Flanders"},
+  {date:"2026-02-12",group:"Cortana Kiwanis Club",ctx:"Engagement",n:14,names:"Cortana Kiwanis Club"},
+  {date:"2026-02-12",group:"Pipe and Steel Industrial",ctx:"LAMA",n:12,names:"Shelbie Bailey"},
+  {date:"2026-02-13",group:"LSU Bio. & Ag. Eng.",ctx:"Project",n:2,names:"Michael Lacourrege, Calley Chauvin"},
+  {date:"2026-02-20",group:"LSU Bio. & Ag. Eng.",ctx:"Project",n:5,names:"Zander Hue, Sydney MacDonald"},
+  {date:"2026-03-11",group:"Master Gardeners",ctx:"Engagement",n:12,names:"John Harley, Joy Baudreaux +10"},
+  {date:"2026-03-26",group:"Mycocentrics",ctx:"Tour",n:1,names:"Jordan Gros"},
+  {date:"2026-04-02",group:"Westside Junior High",ctx:"Tour",n:2,names:"Amanda Smith, Alysha Guidy"},
+  {date:"2026-04-02",group:"LA Dept. of Education",ctx:"Tour",n:1,names:"Donata Haley"},
+];
+const DEMO_ST = [
+  {name:"Terrence Tiersch",role:"Director",cat:"faculty"},
+  {name:"Teresa Gutierrez-Wing",role:"Associate Director",cat:"faculty"},
+  {name:"Yue Liu",role:"Staff Scientist",cat:"faculty"},
+  {name:"Jack Koch",role:"Research Associate",cat:"faculty"},
+  {name:"Chris Toepfer",role:"Outreach & Communications",cat:"faculty"},
+];
+const DEMO_SU = [
+  {name:"Blaise Segura",role:"Senior Design — ME",cat:"student"},
+  {name:"Sydney MacDonald",role:"Senior Design — BAE",cat:"student"},
+  {name:"Chiemeka Osiagwu",role:"Senior Design — BAE",cat:"student"},
+  {name:"Michael Lacourrege",role:"LSU Bio. & Ag. Eng.",cat:"student"},
+  {name:"Calley Chauvin",role:"LSU Bio. & Ag. Eng.",cat:"student"},
+  {name:"Madeline Marsalone",role:"LSU Ind. Eng.",cat:"student"},
+  {name:"Taylor Derryberry",role:"LSU Ind. Eng.",cat:"student"},
+  {name:"Mya Alford",role:"Senior Design",cat:"student"},
+  {name:"Bershell Raynaud",role:"Senior Design",cat:"student"},
+  {name:"Evangeline Miller",role:"Apprentice / AgCenter",cat:"student"},
+];
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let events=[], staff=[], students=[], localEv=[], localPpl=[];
+let activeCtx="all", charts={};
+
+// ── CSV PARSER ─────────────────────────────────────────────────────────────
+function parseCSV(t) {
+  const lines = t.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
+  return lines.slice(1).map(line => {
+    const vals=[]; let cur="", inQ=false;
+    for (const ch of line) {
+      if (ch==='"') { inQ=!inQ; }
+      else if (ch===',' && !inQ) { vals.push(cur.trim()); cur=""; }
+      else cur += ch;
+    }
+    vals.push(cur.trim());
+    const o={};
+    hdrs.forEach((h,i) => o[h] = (vals[i]||"").replace(/^"|"$/g,""));
+    return o;
+  });
+}
+
+const gv = (o,...ks) => { for (const k of ks) { const v=Object.entries(o).find(([key])=>key.toLowerCase()===k.toLowerCase()); if(v) return v[1]||""; } return ""; };
+const mapEv = r => ({ date:gv(r,"date"), group:gv(r,"group"), ctx:gv(r,"context"), n:parseInt(gv(r,"number of participants","participants","n"))||1, names:gv(r,"names","name") });
+const mapSt = r => ({ name:gv(r,"name"), role:gv(r,"role"), cat:(gv(r,"category")||"").toLowerCase().includes("student")?"student":"faculty", slug:gv(r,"slug")||gv(r,"name").split(" ").pop().toLowerCase().replace(/[^a-z0-9-]/g,"") });
+const mapSu = r => ({ name:gv(r,"name"), role:gv(r,"role / affiliation","role"), cat:"student" });
+
+// ── STATUS ─────────────────────────────────────────────────────────────────
+function setStatus(txt, live) {
+  document.getElementById("statusTxt").textContent = txt;
+  document.getElementById("statusDot").className = "dot" + (live ? "" : " demo");
+}
+
+// ── FETCH ──────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const btn = document.getElementById("refreshBtn");
+  btn.disabled = true; btn.textContent = "⟳ Loading…";
+  setStatus("Connecting…", null);
+  try {
+    const [et, st, sut] = await Promise.all([
+      fetch(URLS.engagements, {cache:"no-cache"}).then(r => r.text()),
+      fetch(URLS.staff,       {cache:"no-cache"}).then(r => r.text()),
+      fetch(URLS.students,    {cache:"no-cache"}).then(r => r.text()),
+    ]);
+    const evRows = parseCSV(et).map(mapEv).filter(e => e.date && e.group);
+    const stRows = parseCSV(st).map(mapSt).filter(e => e.name);
+    const suRows = parseCSV(sut).map(mapSu).filter(e => e.name);
+    events   = [...evRows, ...localEv];
+    staff    = [...stRows, ...localPpl.filter(p => p.cat==="faculty")];
+    students = [...suRows, ...localPpl.filter(p => p.cat==="student")];
+    const t = new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+    setStatus(`Live · ${evRows.length} events · updated ${t}`, true);
+  } catch(e) {
+    events   = [...DEMO_EV, ...localEv];
+    staff    = [...DEMO_ST, ...localPpl.filter(p => p.cat==="faculty")];
+    students = [...DEMO_SU, ...localPpl.filter(p => p.cat==="student")];
+    setStatus("Demo data — sheet unreachable", false);
+  }
+  btn.disabled = false; btn.textContent = "⟳ Refresh";
+  renderAll();
+}
+
+// ── AVATARS ────────────────────────────────────────────────────────────────
+const AV = [
+  {bg:"#E1F5EE",c:"#0F6E56"},{bg:"#E6F1FB",c:"#185FA5"},{bg:"#EEEDFE",c:"#534AB7"},
+  {bg:"#FAEEDA",c:"#854F0B"},{bg:"#FAECE7",c:"#993C1D"},{bg:"#EAF3DE",c:"#3B6D11"},
+];
+function avHTML(name, i) {
+  const {bg,c} = AV[i % AV.length];
+  const ini = name.split(" ").filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  return `<div class="av" style="background:${bg};color:${c}">${ini}</div>`;
+}
+
+// ── BADGE ──────────────────────────────────────────────────────────────────
+function bc(ctx) {
+  return ({Engagement:"bE",Project:"bP",LAMA:"bL",Tour:"bT",Interview:"bI",Apprenticeship:"bA","Senior Design":"bS",Fundraising:"bF"})[ctx]||"bO";
+}
+
+// ── RENDER METRICS ─────────────────────────────────────────────────────────
+function renderMetrics() {
+  const total = events.length;
+  const totalP = events.reduce((s,e) => s+(+e.n||0), 0);
+  const groups = new Set(events.map(e=>e.group)).size;
+  const latest = events.slice().sort((a,b)=>((b.date||"")>(a.date||""))?1:-1)[0];
+  document.getElementById("metrics").innerHTML = [
+    {l:"Total events",    v: total},
+    {l:"Participants",    v: totalP},
+    {l:"Unique groups",   v: groups},
+    {l:"Latest",          v: latest ? (latest.date||"").slice(5) : "—"},
+  ].map(m => `<div class="metric"><div class="metric-val">${m.v}</div><div class="metric-lbl">${m.l}</div></div>`).join("");
+}
+
+// ── RENDER CHARTS ──────────────────────────────────────────────────────────
+function renderCharts() {
+  const ctxC={}, grpC={}, mC={};
+  events.forEach(e => {
+    if (e.ctx)   ctxC[e.ctx]   = (ctxC[e.ctx]||0) + 1;
+    if (e.group) grpC[e.group] = (grpC[e.group]||0) + (+e.n||1);
+    const m = (e.date||"").slice(0,7); if (m) mC[m] = (mC[m]||0)+1;
+  });
+  const dark = matchMedia("(prefers-color-scheme:dark)").matches;
+  const gridC = dark ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.06)";
+  const tickC = dark ? "#888" : "#666";
+  const barC  = dark ? "#5DCAA5" : "#1D9E75";
+  const COLS  = ["#1D9E75","#378ADD","#BA7517","#7F77DD","#D85A30","#3B6D11","#993556","#5F5E5A"];
+  const ctxL  = Object.keys(ctxC).sort((a,b)=>ctxC[b]-ctxC[a]).slice(0,7);
+  const grpS  = Object.entries(grpC).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const months = Object.keys(mC).sort();
+  const base = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:tickC,font:{size:10}},grid:{color:gridC}},
+      y:{ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}
+    }
+  };
+  if (charts.ctx)  charts.ctx.destroy();
+  if (charts.grp)  charts.grp.destroy();
+  if (charts.time) charts.time.destroy();
+  charts.ctx  = new Chart(document.getElementById("ctxChart"),{type:"bar",data:{labels:ctxL,datasets:[{data:ctxL.map(l=>ctxC[l]),backgroundColor:COLS,borderRadius:4}]},options:{...base}});
+  charts.grp  = new Chart(document.getElementById("grpChart"),{type:"bar",data:{labels:grpS.map(g=>g[0]),datasets:[{data:grpS.map(g=>g[1]),backgroundColor:barC,borderRadius:4}]},options:{...base,indexAxis:"y"}});
+  charts.time = new Chart(document.getElementById("timeChart"),{type:"line",data:{labels:months,datasets:[{data:months.map(m=>mC[m]),borderColor:barC,backgroundColor:dark?"rgba(93,202,165,.08)":"rgba(29,158,117,.08)",fill:true,tension:.4,pointRadius:4,pointBackgroundColor:barC}]},options:{...base}});
+}
+
+// ── RENDER FILTERS ─────────────────────────────────────────────────────────
+function renderFilters() {
+  const cs = [...new Set(events.map(e=>e.ctx).filter(Boolean))].sort();
+  document.getElementById("ctxFilters").innerHTML =
+    `<button class="fb ${activeCtx==="all"?"on":""}" onclick="setCtx('all')">All</button>` +
+    cs.map(c => `<button class="fb ${activeCtx===c?"on":""}" onclick="setCtx('${c}')">${c}</button>`).join("");
+}
+function setCtx(v) { activeCtx=v; renderFilters(); renderEvents(); }
+
+// ── RENDER EVENTS ──────────────────────────────────────────────────────────
+function renderEvents() {
+  const q = (document.getElementById("evSearch").value||"").toLowerCase();
+  const f = events.filter(e => {
+    const mc = activeCtx==="all" || e.ctx===activeCtx;
+    const mq = !q || (e.group||"").toLowerCase().includes(q) || (e.ctx||"").toLowerCase().includes(q) || (e.names||"").toLowerCase().includes(q);
+    return mc && mq;
+  }).sort((a,b) => ((b.date||"")>(a.date||"")) ? 1 : -1);
+  if (!f.length) { document.getElementById("evList").innerHTML=`<div class="empty">No engagements match.</div>`; return; }
+  document.getElementById("evList").innerHTML = f.map(e => `
+    <div class="ev-row" role="listitem">
+      <span class="ev-date">${(e.date||"").slice(5).replace("-","/")}</span>
+      <div>
+        <div class="ev-group">${e.group||""}</div>
+        <div class="ev-names">${(e.names||"").split(",").slice(0,2).join(", ")}${(e.names||"").split(",").length>2?" +more":""}</div>
+      </div>
+      <span><span class="badge ${bc(e.ctx)}">${e.ctx||""}</span></span>
+      <span class="ev-n">${e.n||1}</span>
+    </div>`).join("");
+}
+
+// ── RENDER PEOPLE ──────────────────────────────────────────────────────────
+function renderPeople() {
+  document.getElementById("staffGrid").innerHTML = staff.length
+    ? staff.map((p,i) => `<div class="pc">${avHTML(p.name,i)}<div class="pc-name">${p.name}</div><div class="pc-role">${p.role||""}</div><span class="pc-tag">Staff</span></div>`).join("")
+    : `<div class="empty">No staff loaded.</div>`;
+  document.getElementById("studentsGrid").innerHTML = students.length
+    ? students.map((p,i) => `<div class="pc">${avHTML(p.name,i)}<div class="pc-name">${p.name}</div><div class="pc-role">${p.role||""}</div><span class="pc-tag">Student</span></div>`).join("")
+    : `<div class="empty">No students loaded.</div>`;
+}
+
+function renderAll() { renderMetrics(); renderCharts(); renderFilters(); renderEvents(); renderPeople(); }
+
+// ── TABS ───────────────────────────────────────────────────────────────────
+function switchTab(id) {
+  const ids = ["overview","events","staff","students"];
+  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("on", ids[i]===id));
+  document.querySelectorAll(".sec").forEach(s => s.classList.remove("on"));
+  document.getElementById("tab-"+id).classList.add("on");
+}
+
+// ── MODALS ─────────────────────────────────────────────────────────────────
+function openM(type, cat) {
+  if (type==="person" && cat) document.getElementById("p-cat").value = cat==="faculty" ? "faculty" : "student";
+  document.getElementById(type+"Modal").classList.add("open");
+}
+function closeM(type) { document.getElementById(type+"Modal").classList.remove("open"); }
+document.querySelectorAll(".mo-wrap").forEach(m => m.addEventListener("click", e => { if(e.target===m) m.classList.remove("open"); }));
+document.addEventListener("keydown", e => { if(e.key==="Escape") document.querySelectorAll(".mo-wrap.open").forEach(m=>m.classList.remove("open")); });
+
+function saveEvent() {
+  const d = document.getElementById("f-date").value;
+  const g = document.getElementById("f-group").value.trim();
+  if (!d||!g) { alert("Date and group required."); return; }
+  const ev = { date:d, group:g, ctx:document.getElementById("f-ctx").value, n:parseInt(document.getElementById("f-num").value)||1, names:document.getElementById("f-names").value.trim()||"—" };
+  localEv.push(ev); events.push(ev);
+  ["f-date","f-group","f-names","f-email"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+  document.getElementById("f-num").value = "1";
+  closeM("event"); renderAll();
+}
+
+function savePerson() {
+  const name = document.getElementById("p-name").value.trim();
+  if (!name) { alert("Name required."); return; }
+  const p = { name, role:document.getElementById("p-role").value.trim(), cat:document.getElementById("p-cat").value };
+  localPpl.push(p);
+  if (p.cat==="faculty") staff.push(p); else students.push(p);
+  ["p-name","p-role","p-email"].forEach(id => document.getElementById(id).value="");
+  closeM("person"); renderPeople();
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
