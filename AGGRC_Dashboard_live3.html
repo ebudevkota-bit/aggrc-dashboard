@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGGRC — Engagement Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #ffffff;
+    --bg2:      #f7f7f5;
+    --bg3:      #f0efec;
+    --text:     #1a1a1a;
+    --text2:    #6b6b6b;
+    --text3:    #9a9a9a;
+    --border:   rgba(0,0,0,0.09);
+    --border2:  rgba(0,0,0,0.15);
+    --radius:   8px;
+    --radius-lg:12px;
+    --teal:     #1D9E75;
+    --teal-bg:  #E1F5EE;
+    --teal-txt: #0F6E56;
+    --blue-bg:  #E6F1FB;
+    --blue-txt: #185FA5;
+    --amber-bg: #FAEEDA;
+    --amber-txt:#854F0B;
+    --purple-bg:#EEEDFE;
+    --purple-txt:#534AB7;
+    --coral-bg: #FAECE7;
+    --coral-txt:#993C1D;
+    --green-bg: #EAF3DE;
+    --green-txt:#3B6D11;
+    --gray-bg:  #F1EFE8;
+    --gray-txt: #5F5E5A;
+    --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:      #141414;
+      --bg2:     #1c1c1c;
+      --bg3:     #232323;
+      --text:    #e8e8e6;
+      --text2:   #8a8a8a;
+      --text3:   #5a5a5a;
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+    }
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+
+  /* ── LAYOUT ── */
+  .shell { display: flex; flex-direction: column; min-height: 100vh; }
+  .topbar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; flex-wrap: wrap; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .brand-sub  { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .status { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text2); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); display: inline-block; }
+  .dot.demo { background: #BA7517; }
+  .btn-ghost { font-size: 12px; padding: 5px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; font-family: var(--font); transition: background .15s; }
+  .btn-ghost:hover { background: var(--bg2); }
+  .btn-ghost:disabled { opacity: .5; cursor: default; }
+
+  /* ── TABS ── */
+  .tab-bar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+  .tab { padding: 10px 16px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: var(--font); transition: color .15s; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.on { color: var(--text); border-bottom-color: var(--text); }
+
+  /* ── MAIN ── */
+  .main { flex: 1; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .sec { display: none; } .sec.on { display: block; }
+
+  /* ── METRICS ── */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .metric { background: var(--bg2); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-val { font-size: 24px; font-weight: 600; color: var(--text); line-height: 1; }
+  .metric-lbl { font-size: 11px; color: var(--text2); margin-top: 5px; }
+
+  /* ── CHART CARDS ── */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .cc { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+  .cc.full { grid-column: span 2; }
+  .cc-lbl { font-size: 11px; color: var(--text2); margin-bottom: 12px; }
+
+  /* ── SEARCH / FILTER ── */
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .s-ico { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: .35; pointer-events: none; }
+  .search { width: 100%; padding: 8px 10px 8px 32px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s; }
+  .search:focus { border-color: var(--border2); }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .fb { font-size: 11px; padding: 4px 10px; border: 0.5px solid var(--border); border-radius: 20px; background: transparent; color: var(--text2); cursor: pointer; font-family: var(--font); transition: all .15s; }
+  .fb:hover, .fb.on { background: var(--bg2); color: var(--text); border-color: var(--border2); }
+
+  /* ── EVENT LIST ── */
+  .ev-hdr { display: grid; grid-template-columns: 80px 1fr 110px 40px; gap: 8px; padding: 6px 10px; font-size: 11px; color: var(--text2); border-bottom: 0.5px solid var(--border); margin-bottom: 2px; }
+  .ev-row { display: grid; grid-template-columns: 80px 1fr 110px 40px; gap: 8px; align-items: center; padding: 9px 10px; border-radius: var(--radius); font-size: 12px; cursor: default; transition: background .12s; }
+  .ev-row:hover { background: var(--bg2); }
+  .ev-date { font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; }
+  .ev-group { font-weight: 500; color: var(--text); }
+  .ev-names { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .ev-n { text-align: right; font-weight: 600; color: var(--text); font-size: 13px; }
+  .empty { padding: 32px; text-align: center; color: var(--text2); font-size: 13px; }
+
+  /* ── BADGES ── */
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 500; }
+  .bE { background: var(--teal-bg);   color: var(--teal-txt);   }
+  .bP { background: var(--blue-bg);   color: var(--blue-txt);   }
+  .bL { background: var(--amber-bg);  color: var(--amber-txt);  }
+  .bT { background: var(--purple-bg); color: var(--purple-txt); }
+  .bI { background: var(--gray-bg);   color: var(--gray-txt);   }
+  .bA { background: var(--coral-bg);  color: var(--coral-txt);  }
+  .bS { background: var(--green-bg);  color: var(--green-txt);  }
+  .bF { background: var(--amber-bg);  color: var(--amber-txt);  }
+  .bO { background: var(--gray-bg);   color: var(--gray-txt);   }
+
+  /* ── PEOPLE ── */
+  .slbl { font-size: 11px; font-weight: 500; color: var(--text2); text-transform: uppercase; letter-spacing: .8px; margin: 16px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .slbl::after { content: ''; flex: 1; height: 0.5px; background: var(--border); }
+  .pg { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .pc { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; text-align: center; transition: border-color .15s; }
+  .pc:hover { border-color: var(--border2); }
+  .av { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; }
+  .pc-name { font-size: 12px; font-weight: 500; color: var(--text); margin-bottom: 3px; line-height: 1.3; }
+  .pc-role { font-size: 11px; color: var(--text2); margin-bottom: 8px; line-height: 1.4; }
+  .pc-tag  { font-size: 10px; padding: 2px 8px; border-radius: 20px; background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border); }
+
+  /* ── ADD BUTTON ── */
+  .add-btn { font-size: 12px; padding: 6px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--bg); color: var(--text); cursor: pointer; font-family: var(--font); margin-bottom: 14px; display: inline-flex; align-items: center; gap: 5px; }
+  .add-btn:hover { background: var(--bg2); }
+
+  /* ── MODAL ── */
+  .mo-wrap { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; align-items: center; justify-content: center; }
+  .mo-wrap.open { display: flex; }
+  .mo { background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); padding: 22px; width: 380px; max-width: 95vw; }
+  .mo h3 { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 16px; }
+  .fr { margin-bottom: 10px; }
+  .fr label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+  .fr input, .fr select { width: 100%; padding: 7px 10px; font-size: 13px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); font-family: var(--font); outline: none; }
+  .fr input:focus, .fr select:focus { border-color: var(--border2); }
+  .fg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ma { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .btn-save   { padding: 7px 18px; background: var(--text); color: var(--bg); border: none; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); }
+  .btn-cancel { padding: 7px 12px; background: none; border: 0.5px solid var(--border); border-radius: var(--radius); font-size: 13px; cursor: pointer; color: var(--text2); font-family: var(--font); }
+  .btn-save:hover   { opacity: .85; }
+  .btn-cancel:hover { border-color: var(--border2); color: var(--text); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .cc.full   { grid-column: span 1; }
+    .main { padding: 16px; }
+    .topbar { padding: 12px 16px; }
+    .ev-hdr, .ev-row { grid-template-columns: 68px 1fr 90px 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 24 C12 16,22 12,32 16 C38 18,42 22,40 24 C42 26,38 30,32 32 C22 36,12 32,8 24Z" fill="none" stroke="#1D9E75" stroke-width="2.2"/>
+        <path d="M40 24 L46 18 L44 24 L46 30Z" fill="#1D9E75" opacity=".85"/>
+        <path d="M14 20 C18 18,26 18,32 21" stroke="#1D9E75" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <path d="M14 28 C18 30,26 30,32 27" stroke="#1D9E75" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        <circle cx="19" cy="24" r="2.5" fill="#1D9E75"/>
+        <circle cx="20" cy="23" r="1" fill="#fff" opacity=".9"/>
+      </svg>
+      <div>
+        <div class="brand-name">AGGRC</div>
+        <div class="brand-sub">Aquatic Germplasm &amp; Genetic Resources Center</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="status"><span class="dot demo" id="statusDot"></span><span id="statusTxt">Loading…</span></div>
+      <button class="btn-ghost" id="refreshBtn" onclick="loadAll()">⟳ Refresh</button>
+    </div>
+  </header>
+
+  <!-- TAB BAR -->
+  <nav class="tab-bar" role="tablist">
+    <button class="tab on" role="tab" onclick="switchTab('overview')">Overview</button>
+    <button class="tab" role="tab" onclick="switchTab('events')">Engagements</button>
+    <button class="tab" role="tab" onclick="switchTab('staff')">Staff</button>
+    <button class="tab" role="tab" onclick="switchTab('students')">Students</button>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <section class="sec on" id="tab-overview" role="tabpanel">
+      <div class="metrics" id="metrics"></div>
+      <div class="chart-row">
+        <div class="cc">
+          <div class="cc-lbl">By context type</div>
+          <div style="position:relative;height:185px">
+            <canvas id="ctxChart" role="img" aria-label="Bar chart of engagement counts by context type">Engagement counts by context type.</canvas>
+          </div>
+        </div>
+        <div class="cc">
+          <div class="cc-lbl">Top groups by reach</div>
+          <div style="position:relative;height:185px">
+            <canvas id="grpChart" role="img" aria-label="Horizontal bar chart of top groups by participant count">Top groups by participant count.</canvas>
+          </div>
+        </div>
+      </div>
+      <div class="cc full">
+        <div class="cc-lbl">Monthly activity</div>
+        <div style="position:relative;height:130px">
+          <canvas id="timeChart" role="img" aria-label="Line chart of monthly engagement activity">Monthly engagement trend.</canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENGAGEMENTS -->
+    <section class="sec" id="tab-events" role="tabpanel">
+      <button class="add-btn" onclick="openM('event')">+ Log engagement</button>
+      <div class="search-wrap">
+        <span class="s-ico">🔍</span>
+        <input class="search" id="evSearch" placeholder="Search group, context, or name…" oninput="renderEvents()">
+      </div>
+      <div class="filters" id="ctxFilters"></div>
+      <div class="ev-hdr" aria-hidden="true"><span>Date</span><span>Group / names</span><span>Context</span><span style="text-align:right">N</span></div>
+      <div id="evList" role="list"></div>
+    </section>
+
+    <!-- STAFF -->
+    <section class="sec" id="tab-staff" role="tabpanel">
+      <button class="add-btn" onclick="openM('person','faculty')">+ Add staff</button>
+      <div class="slbl">Core team &amp; staff</div>
+      <div class="pg" id="staffGrid"></div>
+    </section>
+
+    <!-- STUDENTS -->
+    <section class="sec" id="tab-students" role="tabpanel">
+      <button class="add-btn" onclick="openM('person','student')">+ Add student</button>
+      <div class="slbl">Students, interns &amp; volunteers</div>
+      <div class="pg" id="studentsGrid"></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- EVENT MODAL -->
+<div class="mo-wrap" id="eventModal" role="dialog" aria-modal="true" aria-label="Log engagement">
+  <div class="mo">
+    <h3>Log engagement</h3>
+    <div class="fg">
+      <div class="fr"><label for="f-date">Date</label><input type="date" id="f-date"></div>
+      <div class="fr"><label for="f-num">Participants</label><input type="number" id="f-num" min="1" value="1"></div>
+    </div>
+    <div class="fr"><label for="f-group">Group / organization</label><input type="text" id="f-group" placeholder="e.g. LSU Bio Club"></div>
+    <div class="fr"><label for="f-ctx">Context</label>
+      <select id="f-ctx">
+        <option>Engagement</option><option>Project</option><option>LAMA</option>
+        <option>Tour</option><option>Interview</option><option>Apprenticeship</option>
+        <option>Senior Design</option><option>Fundraising</option><option>Operations</option><option>Print</option>
+      </select>
+    </div>
+    <div class="fr"><label for="f-names">Names</label><input type="text" id="f-names" placeholder="Jane Doe, John Smith"></div>
+    <div class="fr"><label for="f-email">Email</label><input type="email" id="f-email"></div>
+    <div class="ma">
+      <button class="btn-cancel" onclick="closeM('event')">Cancel</button>
+      <button class="btn-save"   onclick="saveEvent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- PERSON MODAL -->
+<div class="mo-wrap" id="personModal" role="dialog" aria-modal="true" aria-label="Add team member">
+  <div class="mo">
+    <h3>Add team member</h3>
+    <div class="fr"><label for="p-name">Full name</label><input type="text" id="p-name"></div>
+    <div class="fr"><label for="p-role">Role / title</label><input type="text" id="p-role"></div>
+    <div class="fr"><label for="p-email">Email</label><input type="email" id="p-email"></div>
+    <div class="fr"><label for="p-cat">Category</label>
+      <select id="p-cat">
+        <option value="faculty">Staff / faculty</option>
+        <option value="student">Student / intern</option>
+      </select>
+    </div>
+    <div class="ma">
+      <button class="btn-cancel" onclick="closeM('person')">Cancel</button>
+      <button class="btn-save"   onclick="savePerson()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── GOOGLE SHEETS CSV URLS ─────────────────────────────────────────────────
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwLu2N2lKGbs1pihzj2d0fGT0XaGvfjAW03c-KiLxFv33vQYjziMyJeeTfTcOUv7l8U/exec";
+const URLS = {
+  engagements: APPS_SCRIPT_URL + "?tab=engagements",
+  staff:       APPS_SCRIPT_URL + "?tab=staff",
+  students:    APPS_SCRIPT_URL + "?tab=students",
+};
+
+// ── FALLBACK DEMO DATA ─────────────────────────────────────────────────────
+const DEMO_EV = [
+  {date:"2026-01-06",group:"WBRZ",ctx:"Interview",n:1,names:"David Hamilton"},
+  {date:"2026-01-08",group:"Meltio",ctx:"LAMA",n:5,names:"Gabriel Ortiz, Jose Luis Sanchez"},
+  {date:"2026-01-22",group:"CASN",ctx:"Engagement",n:4,names:"Natalie Ray, Summer Dann, Frank Neubrander"},
+  {date:"2026-01-27",group:"LSU Foundation",ctx:"Fundraising",n:1,names:"Claire Francois"},
+  {date:"2026-02-06",group:"BRCC Engineering Club",ctx:"Engagement",n:7,names:"Abigail Curl, Vickie Flanders"},
+  {date:"2026-02-12",group:"Cortana Kiwanis Club",ctx:"Engagement",n:14,names:"Cortana Kiwanis Club"},
+  {date:"2026-02-12",group:"Pipe and Steel Industrial",ctx:"LAMA",n:12,names:"Shelbie Bailey"},
+  {date:"2026-02-13",group:"LSU Bio. & Ag. Eng.",ctx:"Project",n:2,names:"Michael Lacourrege, Calley Chauvin"},
+  {date:"2026-02-20",group:"LSU Bio. & Ag. Eng.",ctx:"Project",n:5,names:"Zander Hue, Sydney MacDonald"},
+  {date:"2026-03-11",group:"Master Gardeners",ctx:"Engagement",n:12,names:"John Harley, Joy Baudreaux +10"},
+  {date:"2026-03-26",group:"Mycocentrics",ctx:"Tour",n:1,names:"Jordan Gros"},
+  {date:"2026-04-02",group:"Westside Junior High",ctx:"Tour",n:2,names:"Amanda Smith, Alysha Guidy"},
+  {date:"2026-04-02",group:"LA Dept. of Education",ctx:"Tour",n:1,names:"Donata Haley"},
+];
+const DEMO_ST = [
+  {name:"Terrence Tiersch",role:"Director",cat:"faculty"},
+  {name:"Teresa Gutierrez-Wing",role:"Associate Director",cat:"faculty"},
+  {name:"Yue Liu",role:"Staff Scientist",cat:"faculty"},
+  {name:"Jack Koch",role:"Research Associate",cat:"faculty"},
+  {name:"Chris Toepfer",role:"Outreach & Communications",cat:"faculty"},
+];
+const DEMO_SU = [
+  {name:"Blaise Segura",role:"Senior Design — ME",cat:"student"},
+  {name:"Sydney MacDonald",role:"Senior Design — BAE",cat:"student"},
+  {name:"Chiemeka Osiagwu",role:"Senior Design — BAE",cat:"student"},
+  {name:"Michael Lacourrege",role:"LSU Bio. & Ag. Eng.",cat:"student"},
+  {name:"Calley Chauvin",role:"LSU Bio. & Ag. Eng.",cat:"student"},
+  {name:"Madeline Marsalone",role:"LSU Ind. Eng.",cat:"student"},
+  {name:"Taylor Derryberry",role:"LSU Ind. Eng.",cat:"student"},
+  {name:"Mya Alford",role:"Senior Design",cat:"student"},
+  {name:"Bershell Raynaud",role:"Senior Design",cat:"student"},
+  {name:"Evangeline Miller",role:"Apprentice / AgCenter",cat:"student"},
+];
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let events=[], staff=[], students=[], localEv=[], localPpl=[];
+let activeCtx="all", charts={};
+
+// ── CSV PARSER ─────────────────────────────────────────────────────────────
+function parseCSV(t) {
+  const lines = t.trim().split("\n").filter(l => l.trim());
+  if (lines.length < 2) return [];
+  const hdrs = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
+  return lines.slice(1).map(line => {
+    const vals=[]; let cur="", inQ=false;
+    for (const ch of line) {
+      if (ch==='"') { inQ=!inQ; }
+      else if (ch===',' && !inQ) { vals.push(cur.trim()); cur=""; }
+      else cur += ch;
+    }
+    vals.push(cur.trim());
+    const o={};
+    hdrs.forEach((h,i) => o[h] = (vals[i]||"").replace(/^"|"$/g,""));
+    return o;
+  });
+}
+
+const gv = (o,...ks) => { for (const k of ks) { const v=Object.entries(o).find(([key])=>key.toLowerCase()===k.toLowerCase()); if(v) return v[1]||""; } return ""; };
+const mapEv = r => ({ date:gv(r,"date"), group:gv(r,"group"), ctx:gv(r,"context"), n:parseInt(gv(r,"number of participants","participants","n"))||1, names:gv(r,"names","name") });
+const mapSt = r => ({ name:gv(r,"name"), role:gv(r,"role"), cat:(gv(r,"category")||"").toLowerCase().includes("student")?"student":"faculty", slug:gv(r,"slug")||gv(r,"name").split(" ").pop().toLowerCase().replace(/[^a-z0-9-]/g,"") });
+const mapSu = r => ({ name:gv(r,"name"), role:gv(r,"role / affiliation","role"), cat:"student" });
+
+// ── STATUS ─────────────────────────────────────────────────────────────────
+function setStatus(txt, live) {
+  document.getElementById("statusTxt").textContent = txt;
+  document.getElementById("statusDot").className = "dot" + (live ? "" : " demo");
+}
+
+// ── FETCH ──────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const btn = document.getElementById("refreshBtn");
+  btn.disabled = true; btn.textContent = "⟳ Loading…";
+  setStatus("Connecting…", null);
+  try {
+    const fetchCSV = async (url) => {
+      const r = await fetch(url, {redirect:"follow"});
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.text();
+    };
+    const [et, st, sut] = await Promise.all([
+      fetchCSV(APPS_SCRIPT_URL + "?tab=engagements"),
+      fetchCSV(APPS_SCRIPT_URL + "?tab=staff"),
+      fetchCSV(APPS_SCRIPT_URL + "?tab=students"),
+    ]);
+    const evRows = parseCSV(et).map(mapEv).filter(e => e.date && e.group);
+    const stRows = parseCSV(st).map(mapSt).filter(e => e.name);
+    const suRows = parseCSV(sut).map(mapSu).filter(e => e.name);
+    events   = [...evRows, ...localEv];
+    staff    = [...stRows, ...localPpl.filter(p => p.cat==="faculty")];
+    students = [...suRows, ...localPpl.filter(p => p.cat==="student")];
+    const t = new Date().toLocaleTimeString("en-US",{hour:"2-digit",minute:"2-digit"});
+    setStatus(`Live · ${evRows.length} events · updated ${t}`, true);
+  } catch(err) {
+    events   = [...DEMO_EV, ...localEv];
+    staff    = [...DEMO_ST, ...localPpl.filter(p => p.cat==="faculty")];
+    students = [...DEMO_SU, ...localPpl.filter(p => p.cat==="student")];
+    setStatus("Demo data — " + err.message, false);
+  }
+  btn.disabled = false; btn.textContent = "⟳ Refresh";
+  renderAll();
+}
+
+// ── AVATARS ────────────────────────────────────────────────────────────────
+const CARTOON_AVATARS = {
+"Terrence Tiersch": `<svg viewBox="0 0 80 80" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="overflow:visible"><style>.arm-r{transform-origin:56px 50px;animation:wave 2s ease-in-out infinite}@keyframes wave{0%,100%{transform:rotate(0)}20%{transform:rotate(-20deg)}40%{transform:rotate(20deg)}60%{transform:rotate(-15deg)}80%{transform:rotate(10deg)}}</style><circle cx="40" cy="40" r="38" fill="#E1F5EE"/><path d="M16 72 Q20 56 40 54 Q60 56 64 72Z" fill="#3B6D8A"/><rect x="33" y="47" width="14" height="9" rx="3" fill="#C68642"/><ellipse cx="40" cy="36" rx="19" ry="20" fill="#C68642"/><ellipse cx="22" cy="36" rx="4" ry="5" fill="#C68642"/><ellipse cx="58" cy="36" rx="4" ry="5" fill="#C68642"/><path d="M23 27 Q30 17 40 17 Q50 17 57 27 Q50 20 40 20 Q30 20 23 27Z" fill="#aaa"/><path d="M28 46 Q34 52 40 53 Q46 52 52 46" stroke="#bbb" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="24" y="32" width="12" height="8" rx="3" fill="none" stroke="#555" stroke-width="1.5"/><rect x="44" y="32" width="12" height="8" rx="3" fill="none" stroke="#555" stroke-width="1.5"/><line x1="36" y1="36" x2="44" y2="36" stroke="#555" stroke-width="1.2"/><circle cx="30" cy="36" r="2.5" fill="#5C3A1E"/><circle cx="50" cy="36" r="2.5" fill="#5C3A1E"/><path d="M26 31 Q30 28 35 31" stroke="#999" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M45 31 Q50 28 55 31" stroke="#999" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M33 45 Q40 50 47 45" stroke="#7A4A2A" stroke-width="1.5" fill="none" stroke-linecap="round"/><g class="arm-r"><path d="M56 56 Q64 50 68 42" stroke="#C68642" stroke-width="4.5" fill="none" stroke-linecap="round"/><circle cx="69" cy="40" r="3.5" fill="#C68642"/><path d="M67 37 Q65 33 67 31" stroke="#C68642" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M71 36 Q71 32 73 30" stroke="#C68642" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M73 39 Q75 35 77 35" stroke="#C68642" stroke-width="2" fill="none" stroke-linecap="round"/></g><path d="M24 56 Q16 52 14 46" stroke="#C68642" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>`,
+
+"Teresa Gutierrez-Wing": `<svg viewBox="0 0 80 80" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="animation:bob 2.5s ease-in-out infinite;overflow:visible"><style>@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}</style><circle cx="40" cy="40" r="38" fill="#FBEAF0"/><path d="M14 72 Q18 56 40 54 Q62 56 66 72Z" fill="#8B4A9C"/><path d="M22 28 Q20 48 22 66" fill="none" stroke="#1A0A00" stroke-width="7" stroke-linecap="round"/><path d="M58 28 Q60 48 58 66" fill="none" stroke="#1A0A00" stroke-width="7" stroke-linecap="round"/><rect x="33" y="47" width="14" height="9" rx="3" fill="#D4956A"/><ellipse cx="40" cy="35" rx="19" ry="20" fill="#D4956A"/><ellipse cx="22" cy="35" rx="3.5" ry="4.5" fill="#D4956A"/><ellipse cx="58" cy="35" rx="3.5" ry="4.5" fill="#D4956A"/><path d="M22 26 Q27 15 40 14 Q53 15 58 26 Q51 18 40 18 Q29 18 22 26Z" fill="#1A0A00"/><rect x="25" y="30" width="12" height="9" rx="2.5" fill="none" stroke="#333" stroke-width="1.5"/><rect x="43" y="30" width="12" height="9" rx="2.5" fill="none" stroke="#333" stroke-width="1.5"/><line x1="37" y1="34" x2="43" y2="34" stroke="#333" stroke-width="1.2"/><circle cx="31" cy="34" r="2.5" fill="#2C1A0E"/><circle cx="49" cy="34" r="2.5" fill="#2C1A0E"/><path d="M26 29 Q31 26 37 29" stroke="#1A0A00" stroke-width="1.8" fill="none"/><path d="M43 29 Q48 26 54 29" stroke="#1A0A00" stroke-width="1.8" fill="none"/><path d="M32 44 Q40 50 48 44" stroke="#8B4A2A" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="22" cy="39" r="2.5" fill="#FFD700"/><circle cx="58" cy="39" r="2.5" fill="#FFD700"/><path d="M23 56 Q15 52 13 46" stroke="#D4956A" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M57 56 Q65 52 67 46" stroke="#D4956A" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>`,
+
+"Yue Liu": `<svg viewBox="0 0 80 80" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="animation:think 3s ease-in-out infinite;overflow:visible"><style>@keyframes think{0%,100%{transform:translateY(0) rotate(0)}40%{transform:translateY(-3px) rotate(-2deg)}70%{transform:translateY(-2px) rotate(1deg)}}</style><circle cx="40" cy="40" r="38" fill="#E6F1FB"/><path d="M14 72 Q18 56 40 54 Q62 56 66 72Z" fill="#2C3E6B"/><path d="M32 54 L28 62 L36 66Z" fill="#fff"/><path d="M48 54 L52 62 L44 66Z" fill="#fff"/><path d="M35 54 L40 66 L45 54 Q43 56 40 57 Q37 56 35 54Z" fill="#C0392B"/><rect x="33" y="47" width="14" height="9" rx="3" fill="#E8C49A"/><ellipse cx="40" cy="35" rx="19" ry="20" fill="#E8C49A"/><ellipse cx="22" cy="35" rx="3.5" ry="4.5" fill="#E8C49A"/><ellipse cx="58" cy="35" rx="3.5" ry="4.5" fill="#E8C49A"/><path d="M22 25 Q27 14 40 13 Q53 14 58 25 Q51 17 40 17 Q29 17 22 25Z" fill="#0D0D0D"/><ellipse cx="31" cy="35" rx="5.5" ry="3.5" fill="#fff"/><ellipse cx="49" cy="35" rx="5.5" ry="3.5" fill="#fff"/><circle cx="32" cy="35" r="2.5" fill="#1A0A00"/><circle cx="50" cy="35" r="2.5" fill="#1A0A00"/><circle cx="33" cy="34" r="1" fill="#fff"/><circle cx="51" cy="34" r="1" fill="#fff"/><path d="M26 31 Q31 28 36 31" stroke="#0D0D0D" stroke-width="1.8" fill="none"/><path d="M44 31 Q49 28 54 31" stroke="#0D0D0D" stroke-width="1.8" fill="none"/><path d="M34 44 Q40 48 46 44" stroke="#B07050" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="68" cy="14" r="7" fill="#fff" stroke="#ddd" stroke-width="0.5"/><circle cx="62" cy="22" r="4" fill="#fff" stroke="#ddd" stroke-width="0.5"/><circle cx="57" cy="28" r="2.5" fill="#fff" stroke="#ddd" stroke-width="0.5"/><text x="68" y="17" text-anchor="middle" font-size="8" fill="#999">?</text><path d="M23 56 Q16 50 18 44" stroke="#E8C49A" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M57 56 Q64 50 62 44" stroke="#E8C49A" stroke-width="4.5" fill="none" stroke-linecap="round"/></svg>`,
+
+"Jack Koch": `<svg viewBox="0 0 90 80" width="72" height="64" xmlns="http://www.w3.org/2000/svg" style="overflow:visible"><style>.fish-body{animation:cast 3s ease-in-out infinite;transform-origin:40px 45px}@keyframes cast{0%,100%{transform:rotate(0)}30%{transform:rotate(-8deg)}70%{transform:rotate(5deg)}}.fish-anim{animation:swim 2s ease-in-out infinite alternate}@keyframes swim{0%{transform:translateX(-8px)}100%{transform:translateX(8px)}}.fline{animation:flinebob 2s ease-in-out infinite}@keyframes flinebob{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}</style><circle cx="40" cy="40" r="38" fill="#EAF3DE"/><g class="fish-body"><path d="M16 72 Q20 56 40 54 Q60 56 64 72Z" fill="#4A8C5C"/><rect x="33" y="47" width="14" height="9" rx="3" fill="#F5CFA0"/><ellipse cx="40" cy="35" rx="19" ry="20" fill="#F5CFA0"/><ellipse cx="22" cy="35" rx="3.5" ry="4.5" fill="#F5CFA0"/><ellipse cx="58" cy="35" rx="3.5" ry="4.5" fill="#F5CFA0"/><path d="M22 25 Q27 14 40 13 Q53 14 58 25 Q51 17 40 17 Q29 17 22 25Z" fill="#6B3A2A"/><path d="M36 13 Q40 9 44 13 Q42 11 40 12 Q38 11 36 13Z" fill="#6B3A2A"/><circle cx="31" cy="35" r="5" fill="#fff"/><circle cx="49" cy="35" r="5" fill="#fff"/><circle cx="32" cy="35" r="3" fill="#2E6B3E"/><circle cx="50" cy="35" r="3" fill="#2E6B3E"/><circle cx="33" cy="34" r="1.2" fill="#fff"/><circle cx="51" cy="34" r="1.2" fill="#fff"/><path d="M26 30 Q31 27 36 30" stroke="#6B3A2A" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M44 30 Q49 27 54 30" stroke="#6B3A2A" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M31 45 Q40 52 49 45" stroke="#B07050" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="32" cy="47" r="1.5" fill="#E0B080"/><circle cx="48" cy="47" r="1.5" fill="#E0B080"/><path d="M57 56 Q66 48 72 36 Q74 28 76 20" stroke="#F5CFA0" stroke-width="4.5" fill="none" stroke-linecap="round"/><line x1="73" y1="38" x2="82" y2="16" stroke="#8B5A2A" stroke-width="2" stroke-linecap="round"/><path d="M23 56 Q16 50 14 44" stroke="#F5CFA0" stroke-width="4.5" fill="none" stroke-linecap="round"/></g><g class="fline"><line x1="82" y1="16" x2="84" y2="55" stroke="#aaa" stroke-width="0.8"/><g class="fish-anim"><ellipse cx="84" cy="62" rx="7" ry="4" fill="#378ADD"/><path d="M91 62 L95 58 L95 66Z" fill="#378ADD"/><circle cx="82" cy="61" r="1" fill="#fff"/></g></g></svg>`,
+
+"Chris Toepfer": `<svg viewBox="0 0 80 80" width="64" height="64" xmlns="http://www.w3.org/2000/svg" style="overflow:visible"><style>.run-body{animation:runbody 0.6s ease-in-out infinite;transform-origin:40px 50px}.run-legs{animation:runlegs 0.6s ease-in-out infinite reverse;transform-origin:40px 65px}@keyframes runbody{0%,100%{transform:rotate(0) translateX(0)}25%{transform:rotate(3deg) translateX(2px)}75%{transform:rotate(-3deg) translateX(-2px)}}@keyframes runlegs{0%,100%{transform:rotate(0)}25%{transform:rotate(8deg)}75%{transform:rotate(-8deg)}}</style><circle cx="40" cy="40" r="38" fill="#FAEEDA"/><g class="run-body"><path d="M18 74 Q22 58 40 56 Q58 58 62 74Z" fill="#2E7BB5"/><rect x="33" y="48" width="14" height="10" rx="3" fill="#D4956A"/><ellipse cx="40" cy="37" rx="20" ry="21" fill="#D4956A"/><ellipse cx="21" cy="37" rx="4" ry="5" fill="#D4956A"/><ellipse cx="59" cy="37" rx="4" ry="5" fill="#D4956A"/><path d="M22 27 Q27 16 40 15 Q53 16 58 27 Q51 19 40 19 Q29 19 22 27Z" fill="#A0724A"/><circle cx="31" cy="37" r="8" fill="none" stroke="#5C3A1E" stroke-width="1.8"/><circle cx="49" cy="37" r="8" fill="none" stroke="#5C3A1E" stroke-width="1.8"/><line x1="39" y1="37" x2="41" y2="37" stroke="#5C3A1E" stroke-width="1.5"/><circle cx="31" cy="37" r="4" fill="#fff"/><circle cx="49" cy="37" r="4" fill="#fff"/><circle cx="32" cy="37" r="2.5" fill="#3D5A1E"/><circle cx="50" cy="37" r="2.5" fill="#3D5A1E"/><path d="M24 30 Q30 27 37 30" stroke="#A0724A" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M43 30 Q49 27 55 30" stroke="#A0724A" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M33 47 Q40 53 47 47" stroke="#8B4A2A" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M22 58 Q13 52 11 46" stroke="#D4956A" stroke-width="4.5" fill="none" stroke-linecap="round"/><path d="M58 58 Q67 54 70 47" stroke="#D4956A" stroke-width="4.5" fill="none" stroke-linecap="round"/></g><g class="run-legs"><path d="M33 72 Q28 80 24 80" stroke="#2E7BB5" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M47 72 Q54 78 58 76" stroke="#2E7BB5" stroke-width="6" fill="none" stroke-linecap="round"/></g><line x1="4" y1="45" x2="14" y2="45" stroke="#ddd" stroke-width="1" stroke-dasharray="2,2"/><line x1="2" y1="51" x2="12" y2="51" stroke="#ddd" stroke-width="1" stroke-dasharray="2,2"/><line x1="5" y1="57" x2="15" y2="57" stroke="#ddd" stroke-width="1" stroke-dasharray="2,2"/></svg>`,
+};
+
+const AV_COLORS = [
+  {bg:"#E1F5EE",c:"#0F6E56"},{bg:"#E6F1FB",c:"#185FA5"},{bg:"#EEEDFE",c:"#534AB7"},
+  {bg:"#FAEEDA",c:"#854F0B"},{bg:"#FAECE7",c:"#993C1D"},{bg:"#EAF3DE",c:"#3B6D11"},
+];
+function avHTML(name, i) {
+  if (CARTOON_AVATARS[name]) {
+    return `<div class="av" style="background:transparent;width:64px;height:64px;overflow:visible">${CARTOON_AVATARS[name]}</div>`;
+  }
+  const {bg,c} = AV_COLORS[i % AV_COLORS.length];
+  const ini = name.split(" ").filter(Boolean).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+  return `<div class="av" style="background:${bg};color:${c}">${ini}</div>`;
+}
+
+// ── BADGE ──────────────────────────────────────────────────────────────────
+function bc(ctx) {
+  return ({Engagement:"bE",Project:"bP",LAMA:"bL",Tour:"bT",Interview:"bI",Apprenticeship:"bA","Senior Design":"bS",Fundraising:"bF"})[ctx]||"bO";
+}
+
+// ── RENDER METRICS ─────────────────────────────────────────────────────────
+function renderMetrics() {
+  const total = events.length;
+  const totalP = events.reduce((s,e) => s+(+e.n||0), 0);
+  const groups = new Set(events.map(e=>e.group)).size;
+  const latest = events.slice().sort((a,b)=>((b.date||"")>(a.date||""))?1:-1)[0];
+  document.getElementById("metrics").innerHTML = [
+    {l:"Total events",    v: total},
+    {l:"Participants",    v: totalP},
+    {l:"Unique groups",   v: groups},
+    {l:"Latest",          v: latest ? (latest.date||"").slice(5) : "—"},
+  ].map(m => `<div class="metric"><div class="metric-val">${m.v}</div><div class="metric-lbl">${m.l}</div></div>`).join("");
+}
+
+// ── RENDER CHARTS ──────────────────────────────────────────────────────────
+function renderCharts() {
+  const ctxC={}, grpC={}, mC={};
+  events.forEach(e => {
+    if (e.ctx)   ctxC[e.ctx]   = (ctxC[e.ctx]||0) + 1;
+    if (e.group) grpC[e.group] = (grpC[e.group]||0) + (+e.n||1);
+    const m = (e.date||"").slice(0,7); if (m) mC[m] = (mC[m]||0)+1;
+  });
+  const dark = matchMedia("(prefers-color-scheme:dark)").matches;
+  const gridC = dark ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.06)";
+  const tickC = dark ? "#888" : "#666";
+  const barC  = dark ? "#5DCAA5" : "#1D9E75";
+  const COLS  = ["#1D9E75","#378ADD","#BA7517","#7F77DD","#D85A30","#3B6D11","#993556","#5F5E5A"];
+  const ctxL  = Object.keys(ctxC).sort((a,b)=>ctxC[b]-ctxC[a]).slice(0,7);
+  const grpS  = Object.entries(grpC).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const months = Object.keys(mC).sort();
+  const base = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:tickC,font:{size:10}},grid:{color:gridC}},
+      y:{ticks:{color:tickC,font:{size:10}},grid:{color:gridC}}
+    }
+  };
+  if (charts.ctx)  charts.ctx.destroy();
+  if (charts.grp)  charts.grp.destroy();
+  if (charts.time) charts.time.destroy();
+  charts.ctx  = new Chart(document.getElementById("ctxChart"),{type:"bar",data:{labels:ctxL,datasets:[{data:ctxL.map(l=>ctxC[l]),backgroundColor:COLS,borderRadius:4}]},options:{...base}});
+  charts.grp  = new Chart(document.getElementById("grpChart"),{type:"bar",data:{labels:grpS.map(g=>g[0]),datasets:[{data:grpS.map(g=>g[1]),backgroundColor:barC,borderRadius:4}]},options:{...base,indexAxis:"y"}});
+  charts.time = new Chart(document.getElementById("timeChart"),{type:"line",data:{labels:months,datasets:[{data:months.map(m=>mC[m]),borderColor:barC,backgroundColor:dark?"rgba(93,202,165,.08)":"rgba(29,158,117,.08)",fill:true,tension:.4,pointRadius:4,pointBackgroundColor:barC}]},options:{...base}});
+}
+
+// ── RENDER FILTERS ─────────────────────────────────────────────────────────
+function renderFilters() {
+  const cs = [...new Set(events.map(e=>e.ctx).filter(Boolean))].sort();
+  document.getElementById("ctxFilters").innerHTML =
+    `<button class="fb ${activeCtx==="all"?"on":""}" onclick="setCtx('all')">All</button>` +
+    cs.map(c => `<button class="fb ${activeCtx===c?"on":""}" onclick="setCtx('${c}')">${c}</button>`).join("");
+}
+function setCtx(v) { activeCtx=v; renderFilters(); renderEvents(); }
+
+// ── RENDER EVENTS ──────────────────────────────────────────────────────────
+function renderEvents() {
+  const q = (document.getElementById("evSearch").value||"").toLowerCase();
+  const f = events.filter(e => {
+    const mc = activeCtx==="all" || e.ctx===activeCtx;
+    const mq = !q || (e.group||"").toLowerCase().includes(q) || (e.ctx||"").toLowerCase().includes(q) || (e.names||"").toLowerCase().includes(q);
+    return mc && mq;
+  }).sort((a,b) => ((b.date||"")>(a.date||"")) ? 1 : -1);
+  if (!f.length) { document.getElementById("evList").innerHTML=`<div class="empty">No engagements match.</div>`; return; }
+  document.getElementById("evList").innerHTML = f.map(e => `
+    <div class="ev-row" role="listitem">
+      <span class="ev-date">${(e.date||"").slice(5).replace("-","/")}</span>
+      <div>
+        <div class="ev-group">${e.group||""}</div>
+        <div class="ev-names">${(e.names||"").split(",").slice(0,2).join(", ")}${(e.names||"").split(",").length>2?" +more":""}</div>
+      </div>
+      <span><span class="badge ${bc(e.ctx)}">${e.ctx||""}</span></span>
+      <span class="ev-n">${e.n||1}</span>
+    </div>`).join("");
+}
+
+// ── RENDER PEOPLE ──────────────────────────────────────────────────────────
+function renderPeople() {
+  document.getElementById("staffGrid").innerHTML = staff.length
+    ? staff.map((p,i) => `<div class="pc">${avHTML(p.name,i)}<div class="pc-name">${p.name}</div><div class="pc-role">${p.role||""}</div><span class="pc-tag">Staff</span></div>`).join("")
+    : `<div class="empty">No staff loaded.</div>`;
+  document.getElementById("studentsGrid").innerHTML = students.length
+    ? students.map((p,i) => `<div class="pc">${avHTML(p.name,i)}<div class="pc-name">${p.name}</div><div class="pc-role">${p.role||""}</div><span class="pc-tag">Student</span></div>`).join("")
+    : `<div class="empty">No students loaded.</div>`;
+}
+
+function renderAll() { renderMetrics(); renderCharts(); renderFilters(); renderEvents(); renderPeople(); }
+
+// ── TABS ───────────────────────────────────────────────────────────────────
+function switchTab(id) {
+  const ids = ["overview","events","staff","students"];
+  document.querySelectorAll(".tab").forEach((t,i) => t.classList.toggle("on", ids[i]===id));
+  document.querySelectorAll(".sec").forEach(s => s.classList.remove("on"));
+  document.getElementById("tab-"+id).classList.add("on");
+}
+
+// ── MODALS ─────────────────────────────────────────────────────────────────
+function openM(type, cat) {
+  if (type==="person" && cat) document.getElementById("p-cat").value = cat==="faculty" ? "faculty" : "student";
+  document.getElementById(type+"Modal").classList.add("open");
+}
+function closeM(type) { document.getElementById(type+"Modal").classList.remove("open"); }
+document.querySelectorAll(".mo-wrap").forEach(m => m.addEventListener("click", e => { if(e.target===m) m.classList.remove("open"); }));
+document.addEventListener("keydown", e => { if(e.key==="Escape") document.querySelectorAll(".mo-wrap.open").forEach(m=>m.classList.remove("open")); });
+
+function saveEvent() {
+  const d = document.getElementById("f-date").value;
+  const g = document.getElementById("f-group").value.trim();
+  if (!d||!g) { alert("Date and group required."); return; }
+  const ev = { date:d, group:g, ctx:document.getElementById("f-ctx").value, n:parseInt(document.getElementById("f-num").value)||1, names:document.getElementById("f-names").value.trim()||"—" };
+  localEv.push(ev); events.push(ev);
+  ["f-date","f-group","f-names","f-email"].forEach(id => { const el=document.getElementById(id); if(el) el.value=""; });
+  document.getElementById("f-num").value = "1";
+  closeM("event"); renderAll();
+}
+
+function savePerson() {
+  const name = document.getElementById("p-name").value.trim();
+  if (!name) { alert("Name required."); return; }
+  const p = { name, role:document.getElementById("p-role").value.trim(), cat:document.getElementById("p-cat").value };
+  localPpl.push(p);
+  if (p.cat==="faculty") staff.push(p); else students.push(p);
+  ["p-name","p-role","p-email"].forEach(id => document.getElementById(id).value="");
+  closeM("person"); renderPeople();
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
